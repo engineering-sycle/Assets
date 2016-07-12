@@ -140,6 +140,16 @@ class Manager
 	 */
 	protected $collections = array();
 
+    /**
+     * Determines if the js() and css() output format.
+     *
+     * If FALSE (default), output a tag for each individual asset file
+     * If TRUE, output a tag for each asset collection
+     *
+     * @var bool
+     */
+    protected $output_as_collections;
+
 	/**
 	 * CSS files already added.
 	 * Not accepted as an option of config() method.
@@ -148,6 +158,14 @@ class Manager
 	 */
 	protected $css = array();
 
+    /**
+     * CSS collections already added.
+     * Not accepted as an option of config() method.
+     *
+     * @var array
+     */
+	protected $cssCollections = array();
+
 	/**
 	 * JavaScript files already added.
 	 * Not accepted as an option of config() method.
@@ -155,11 +173,20 @@ class Manager
 	 * @var array
 	 */
 	protected $js = array();
+    
+    /**
+     * JavaScript collections already added.
+     * Not accepted as an option of config() method.
+     *
+     * @var array
+     */
+	protected $jsCollections = array();
 
 	/**
 	 * Class constructor.
 	 *
 	 * @param  array $options See config() method for details.
+     *
 	 * @return void
 	 */
 	public function __construct(array $options = array())
@@ -187,7 +214,7 @@ class Manager
 				$this->$option = $config[$option];
 
 		// Set common options
-		foreach(array('public_dir', 'css_dir', 'js_dir', 'packages_dir', 'pipeline',  'pipeline_dir', 'pipeline_gzip') as $option)
+		foreach(array('public_dir', 'css_dir', 'js_dir', 'packages_dir', 'pipeline',  'pipeline_dir', 'pipeline_gzip', 'output_as_collections') as $option)
 			if(isset($config[$option]))
 				$this->$option = $config[$option];
 
@@ -227,8 +254,23 @@ class Manager
 		}
 
 		// Collection
-		elseif(isset($this->collections[$asset]))
-			$this->add($this->collections[$asset]);
+		elseif(isset($this->collections[$asset])) {
+            $this->add($this->collections[$asset]);
+
+            // determine if this collection contains JS and/or CSS
+            $foundJs = $foundCss = false;
+            foreach($this->collections[$asset] as $a) {
+                if (!is_array($a)) {
+                    if (!$foundJs && preg_match($this->js_regex, $a)) {
+                        $foundJs = true;
+                        $this->addJsCollection($asset);
+                    } elseif (!$foundCss && preg_match($this->css_regex, $a)) {
+                        $foundCss = true;
+                        $this->addCssCollection($asset);
+                    }
+                }
+            }
+        }
 
 		// JavaScript asset
 		elseif(preg_match($this->js_regex, $asset))
@@ -269,6 +311,17 @@ class Manager
 		return $this;
 	}
 
+    /**
+     * Add a CSS asset collection.
+     *
+     * @param string $assetCollectionName
+     */
+    public function addCssCollection($assetCollectionName)
+    {
+        $this->cssCollections[] = $this->css_dir . '/' . $assetCollectionName . '.css';
+        $this->cssCollections = array_unique($this->cssCollections);
+    }
+
 	/**
 	 * Add a JavaScript asset.
 	 *
@@ -297,6 +350,17 @@ class Manager
 		return $this;
 	}
 
+    /**
+     * Add a JS asset collection.
+     *
+     * @param string $assetCollectionName
+     */
+    public function addJsCollection($assetCollectionName)
+    {
+        $this->jsCollections[] = $this->js_dir . '/' . $assetCollectionName . '.js';
+        $this->jsCollections = array_unique($this->jsCollections);
+    }
+
 	/**
 	 * Build the CSS `<link>` tags.
 	 *
@@ -316,7 +380,8 @@ class Manager
 		if( ! $this->css)
 			return '';
 
-		$assets = ($this->pipeline) ? array($this->cssPipeline()) : $this->css;
+        $assets = $this->output_as_collections ? $this->cssCollections : $this->css;
+		$assets = ($this->pipeline) ? array($this->cssPipeline()) : $assets;
 
 		if($attributes instanceof Closure)
 			return $attributes->__invoke($assets);
@@ -349,6 +414,16 @@ class Manager
 
 		return $output;
 	}
+    public function cssCollections($attributes = null, $queryArgs = null) {
+        // backup setting
+        $tempSetting = $this->output_as_collections;
+		$this->output_as_collections = true;
+        $output = $this->css($attributes, $queryArgs);
+        // copy back
+		$this->output_as_collections = $tempSetting;
+
+        return $output;
+    }
 
 	/**
 	 * Build the JavaScript `<script>` tags.
@@ -369,7 +444,8 @@ class Manager
 		if( ! $this->js)
 			return '';
 
-		$assets = ($this->pipeline) ? array($this->jsPipeline()) : $this->js;
+        $assets = $this->output_as_collections ? $this->jsCollections : $this->js;
+        $assets = ($this->pipeline) ? array($this->jsPipeline()) : $assets;
 
 		if($attributes instanceof Closure)
 			return $attributes->__invoke($assets);
@@ -396,6 +472,16 @@ class Manager
 			}
 			$output .= '<script src="' . $asset . '"' . $attributes . "></script>\n";
 		}
+
+		return $output;
+	}
+	public function jsCollections($attributes = null, $queryArgs = null) {
+		// backup setting
+		$tempSetting = $this->output_as_collections;
+		$this->output_as_collections = true;
+		$output = $this->js($attributes, $queryArgs);
+		// copy back
+		$this->output_as_collections = $tempSetting;
 
 		return $output;
 	}
