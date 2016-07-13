@@ -318,7 +318,13 @@ class Manager
      */
     public function addCssCollection($assetCollectionName)
     {
-        $this->cssCollections[] = $this->css_dir . '/' . $assetCollectionName . '.css';
+		$baseFilename = $this->css_dir . '/' . $assetCollectionName;
+		$minifiedFilename = $baseFilename . '.min.css';
+		$unminifiedFilename = $baseFilename . '.css';
+
+        $this->cssCollections[] = file_exists($this->public_dir . $minifiedFilename) ?
+			$minifiedFilename :
+            $unminifiedFilename;
         $this->cssCollections = array_unique($this->cssCollections);
     }
 
@@ -357,7 +363,13 @@ class Manager
      */
     public function addJsCollection($assetCollectionName)
     {
-        $this->jsCollections[] = $this->js_dir . '/' . $assetCollectionName . '.js';
+        $baseFilename = $this->js_dir . '/' . $assetCollectionName;
+        $minifiedFilename = $baseFilename . '.min.js';
+        $unminifiedFilename = $baseFilename . '.js';
+
+        $this->jsCollections[] = file_exists($this->public_dir . $minifiedFilename) ?
+            $minifiedFilename :
+          	$unminifiedFilename;
         $this->jsCollections = array_unique($this->jsCollections);
     }
 
